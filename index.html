@@ -144,13 +144,13 @@ const CONFIG = {
   // Én linje pr. kantine. "code" bruges i ordrenummeret. Udfyld rigtige navne og adresser.
   // Vises i alfabetisk rækkefølge. code = ét bogstav i ordrenummeret (JUL-F-…) og dermed i MobilePay-beskrivelsen.
   canteens: [
-    { id:'freja',       code:'F', name:'Freja',              address:'Litauen Alle 6, 2630 Taastrup' },
-    { id:'hoerkaer',    code:'H', name:'Hørkær 20',          address:'2730 Herlev' },
-    { id:'kalvebod',    code:'K', name:'Kalvebod Brygge 45', address:'1560 København V' },
-    { id:'lindehuset',  code:'L', name:'Lindehuset',         address:'Lindevangs Alle 8, 2000 Frederiksberg' },
-    { id:'nobelsgaard', code:'N', name:'Nobels Gård',        address:'Nordre Fasanvej 108, 2000 Frederiksberg' },
-    { id:'palmehaven',  code:'B', name:'Palmehaven',         address:'Bernstorffsgade 21, 1577 København V' },
-    { id:'park-alle',   code:'P', name:'Park Alle 295',      address:'2605 Brøndbyøster' },
+    { id:'freja', short:'Freja',       code:'F', name:'Freja',              address:'Litauen Alle 6, 2630 Taastrup' },
+    { id:'hoerkaer', short:'Hørkær',    code:'H', name:'Hørkær 20',          address:'2730 Herlev' },
+    { id:'kalvebod', short:'Kalvebod',    code:'K', name:'Kalvebod Brygge 45', address:'1560 København V' },
+    { id:'lindehuset', short:'Lindehuset',  code:'L', name:'Lindehuset',         address:'Lindevangs Alle 8, 2000 Frederiksberg' },
+    { id:'nobelsgaard', short:'Nobels Gård', code:'N', name:'Nobels Gård',        address:'Nordre Fasanvej 108, 2000 Frederiksberg' },
+    { id:'palmehaven', short:'Palmehaven',  code:'B', name:'Palmehaven',         address:'Bernstorffsgade 21, 1577 København V' },
+    { id:'park-alle', short:'Park Alle',   code:'P', name:'Park Alle 295',      address:'2605 Brøndbyøster' },
   ],
 
   // Produkter. Ingredienslister er EKSEMPLER – køkkenet skal udfylde de rigtige.
@@ -244,11 +244,20 @@ function newOrderNo(canteen){
   do { no = `JUL-${canteen.code}-` + Array.from({length:4}, () => abc[Math.floor(Math.random()*abc.length)]).join(''); } while(existing.has(no));
   return no;
 }
+// Beskrivelsen i MobilePay (maks 60 tegn): ordrenr. + afhentningssted + varer.
+// Er der ikke plads, droppes afhentningsstedet (kantinen står stadig som bogstav i ordrenummeret).
 function orderComment(order){
-  const parts = CONFIG.products.filter(p => order.cart[p.id] > 0).map(p => `${order.cart[p.id]} ${p.short}`);
-  let c = `${order.orderNo} ${parts.join(', ')}`;
-  if(c.length > 60) c = `${order.orderNo} ` + CONFIG.products.filter(p => order.cart[p.id] > 0).map(p => `${order.cart[p.id]}${p.short.slice(0,3)}`).join(' ');
-  return c.slice(0, 60);
+  const items = CONFIG.products.filter(p => order.cart[p.id] > 0);
+  const full = items.map(p => `${order.cart[p.id]} ${p.short}`).join(', ');
+  const compact = items.map(p => `${order.cart[p.id]}${p.short.slice(0,3)}`).join(' ');
+  const c = canteenById(order.canteenId), place = c ? (c.short || c.name) : '';
+  const options = [
+    place && `${order.orderNo} ${place}: ${full}`,
+    `${order.orderNo} ${full}`,
+    place && `${order.orderNo} ${place}: ${compact}`,
+    `${order.orderNo} ${compact}`,
+  ].filter(Boolean);
+  return (options.find(o => o.length <= 60) || options.at(-1)).slice(0, 60);
 }
 function mobilePayLink(order){
   const u = new URL(CONFIG.mobilePayLinkBase);
