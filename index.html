@@ -113,7 +113,10 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 const CONFIG = {
   // Tider i dansk tid (UTC+01:00 i december)
   orderDeadline: '2026-12-17T12:00:00+01:00',
-  pickupFrom:    '2026-12-21T14:00:00+01:00',
+  pickupFrom:    '2026-12-21T13:00:00+01:00',
+  pickupTo:      '2026-12-23T15:00:00+01:00',
+  // Teksten, kunden ser om afhentning:
+  pickupText:    'mandag 21.12 fra kl. 13.00 til onsdag 23.12 – alle dage til kl. 15.00',
 
   // Offentlig adresse, hvor bestillingssiden hostes (bruges i QR-koderne)
   publicUrl: 'https://simplycooking2026.github.io/julemenu/',
@@ -319,13 +322,13 @@ function renderCustomer(){
       <svg class="deco" viewBox="0 0 84 100" aria-hidden="true"><rect x="38" y="80" width="8" height="12" fill="#38383e"/><polygon points="42,14 20,44 64,44" fill="#304f3f"/><polygon points="42,30 14,64 70,64" fill="#243e31"/><polygon points="42,48 8,84 76,84" fill="#304f3f"/><circle cx="34" cy="42" r="2.5" fill="#a1d60b"/><circle cx="52" cy="60" r="2.5" fill="#c8102e"/><circle cx="30" cy="76" r="2.5" fill="#a1d60b"/><circle cx="58" cy="78" r="2.5" fill="#c8102e"/><polygon points="42,2 45,10 53,10 47,15 49,23 42,18 35,23 37,15 31,10 39,10" fill="#a1d60b"/><g transform="translate(16 84)" fill="#c8102e"><path d="M0 0C5-7 5-16 0-22C-5-16-5-7 0 0Z"/><path d="M0 0C5-7 5-16 0-22C-5-16-5-7 0 0Z" transform="rotate(72)"/><path d="M0 0C5-7 5-16 0-22C-5-16-5-7 0 0Z" transform="rotate(144)"/><path d="M0 0C5-7 5-16 0-22C-5-16-5-7 0 0Z" transform="rotate(216)"/><path d="M0 0C5-7 5-16 0-22C-5-16-5-7 0 0Z" transform="rotate(288)"/><circle r="2.5" fill="#a1d60b"/></g></svg>
       <div class="eyebrow">Julemenu til at tage med hjem</div>
       <h1 style="padding-right:90px">Juleand med det hele</h1>
-      <p class="lead" style="padding-right:90px">Bestil inden <b>${fmtDate(CONFIG.orderDeadline)}</b>. Hent fra <b>${fmtDate(CONFIG.pickupFrom)}</b>${c ? ` i <b>${esc(c.name)}</b>` : ''}.</p>
+      <p class="lead" style="padding-right:90px">Bestil inden <b>${fmtDate(CONFIG.orderDeadline)}</b>. Afhentning <b>${esc(CONFIG.pickupText)}</b>${c ? ` i <b>${esc(c.name)}</b>` : ''}.</p>
     </div>`;
 
   if(!isOpen() && state.step !== 'done'){
     app.innerHTML = `<div class="wrap">${header}
       <div class="closed"><h2>Bestillingen er lukket</h2>
-      <p>Fristen var ${fmtDate(CONFIG.orderDeadline)}. Har du bestilt, kan du hente din julemenu fra ${fmtDate(CONFIG.pickupFrom)}. Spørg i kantinen, hvis du har spørgsmål.</p></div></div>`;
+      <p>Fristen var ${fmtDate(CONFIG.orderDeadline)}. Har du bestilt, kan du hente din julemenu ${esc(CONFIG.pickupText)}. Spørg i kantinen, hvis du har spørgsmål.</p></div></div>`;
     return;
   }
 
@@ -432,7 +435,7 @@ function renderCustomer(){
           <h2>Sådan henter du</h2>
           <dl class="info">
             <dt>Hvor</dt><dd>${esc(k.name)}${k.address ? ', ' + esc(k.address) : ''}</dd>
-            <dt>Hvornår</dt><dd>Fra ${fmtDate(CONFIG.pickupFrom)}</dd>
+            <dt>Hvornår</dt><dd>${esc(CONFIG.pickupText.charAt(0).toUpperCase() + CONFIG.pickupText.slice(1))}</dd>
             <dt>Navn</dt><dd>${esc(o.name)}</dd>
             <dt>Betalt</dt><dd>${kr(o.total)} via MobilePay ${esc(CONFIG.mobilePayNumber)}</dd>
           </dl>
@@ -448,7 +451,7 @@ function renderCustomer(){
           <h2>Sådan henter du</h2>
           <dl class="info">
             <dt>Hvor</dt><dd>${esc(k.name)}${k.address ? ', ' + esc(k.address) : ''}</dd>
-            <dt>Hvornår</dt><dd>Fra ${fmtDate(CONFIG.pickupFrom)}</dd>
+            <dt>Hvornår</dt><dd>${esc(CONFIG.pickupText.charAt(0).toUpperCase() + CONFIG.pickupText.slice(1))}</dd>
             <dt>Navn</dt><dd>${esc(o.name)}</dd>
             <dt>Ordrenr.</dt><dd class="ordno">${o.orderNo}</dd>
           </dl>
