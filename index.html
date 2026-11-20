@@ -213,7 +213,16 @@ function updateOrder(no, patch){
 
 /* ---------- Tid (kan simuleres i personalevisningen) ---------- */
 let simulatedNow = null;
-const now = () => simulatedNow ? new Date(simulatedNow) : new Date();
+// Tiden hentes fra serveren (Date-headeren), så et forkert eller ændret telefonur ikke kan holde bestillingen åben.
+let serverOffset = 0;
+async function syncTime(){
+  try{
+    const r = await fetch(location.href.split('#')[0], {method:'HEAD', cache:'no-store'});
+    const d = r.headers.get('Date');
+    if(d){ const t = new Date(d).getTime(); if(!isNaN(t)) serverOffset = t - Date.now(); }
+  }catch(e){ /* fx når filen åbnes lokalt – så bruges enhedens ur */ }
+}
+const now = () => simulatedNow ? new Date(simulatedNow) : new Date(Date.now() + serverOffset);
 const isOpen = () => now() < new Date(CONFIG.orderDeadline);
 
 /* ---------- Prisberegning ---------- */
@@ -410,7 +419,8 @@ function renderCustomer(){
       if(!f.terms) er.terms='Du skal acceptere betingelserne.';
       state.errors = er;
       if(Object.keys(er).length){ renderCustomer(); return; }
-      if(!isOpen()){ renderCustomer(); return; }
+      await syncTime();
+      if(!isOpen()){ state.step = 'menu'; renderCustomer(); return; }
       const canteen = canteenById(f.canteenId);
       const order = {
         orderNo: newOrderNo(canteen), createdAt: now().toISOString(), updatedAt: now().toISOString(),
@@ -487,6 +497,9 @@ function route(){
 if(CONFIG.testPrices) document.getElementById('testBanner').style.display='block';
 window.addEventListener('hashchange', route);
 route();
+syncTime().then(() => { if(!isOpen()) route(); });
+// Luk siden, hvis den står åben, når fristen passeres
+setInterval(() => { if(!isOpen() && state.step !== 'closed'){ state.step = 'closed'; route(); } }, 60000);
 </script>
 </body>
 </html>
