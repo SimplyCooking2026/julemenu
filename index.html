@@ -144,13 +144,13 @@ const CONFIG = {
   // Én linje pr. kantine. "code" bruges i ordrenummeret. Udfyld rigtige navne og adresser.
   // Vises i alfabetisk rækkefølge. code = ét bogstav i ordrenummeret (JUL-F-…) og dermed i MobilePay-beskrivelsen.
   canteens: [
-    { id:'freja',       code:'F', name:'Freja',              address:'Litauen Alle 6' },
-    { id:'hoerkaer',    code:'H', name:'Hørkær 20',          address:'' },
-    { id:'kalvebod',    code:'K', name:'Kalvebod Brygge 45', address:'' },
-    { id:'lindehuset',  code:'L', name:'Lindehuset',         address:'Lindevangs Alle 8' },
-    { id:'nobelsgaard', code:'N', name:'Nobelsgård',         address:'Nordre Fasanvej 108' },
-    { id:'palmehaven',  code:'B', name:'Palmehaven',         address:'Bernstorffsgade 21' },
-    { id:'park-alle',   code:'P', name:'Park Alle 295',      address:'' },
+    { id:'freja',       code:'F', name:'Freja',              address:'Litauen Alle 6, 2630 Taastrup' },
+    { id:'hoerkaer',    code:'H', name:'Hørkær 20',          address:'2730 Herlev' },
+    { id:'kalvebod',    code:'K', name:'Kalvebod Brygge 45', address:'1560 København V' },
+    { id:'lindehuset',  code:'L', name:'Lindehuset',         address:'Lindevangs Alle 8, 2000 Frederiksberg' },
+    { id:'nobelsgaard', code:'N', name:'Nobels Gård',        address:'Nordre Fasanvej 108, 2000 Frederiksberg' },
+    { id:'palmehaven',  code:'B', name:'Palmehaven',         address:'Bernstorffsgade 21, 1577 København V' },
+    { id:'park-alle',   code:'P', name:'Park Alle 295',      address:'2605 Brøndbyøster' },
   ],
 
   // Produkter. Ingredienslister er EKSEMPLER – køkkenet skal udfylde de rigtige.
@@ -192,7 +192,7 @@ const fmtDate = iso => new Date(iso).toLocaleString('da-DK',{timeZone:'Europe/Co
 const prodById = id => CONFIG.products.find(p => p.id === id);
 CONFIG.canteens.sort((a,b) => a.name.localeCompare(b.name, 'da'));
 const canteenById = id => CONFIG.canteens.find(c => c.id === id);
-const canteenLabel = c => c.address ? `${c.name} – ${c.address}` : c.name;
+const canteenLabel = c => !c.address ? c.name : (/^\d{4} /.test(c.address) ? `${c.name}, ${c.address}` : `${c.name} – ${c.address}`);
 
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
 
@@ -446,7 +446,8 @@ function renderCustomer(){
         </section>
         <a class="btn mp" href="${esc(link)}" target="_blank" rel="noopener" id="mpBtn">Betal ${kr(o.total)} med MobilePay</a>
         <p class="muted small" style="text-align:center">MobilePay åbner med beløb og ordrenummer udfyldt (nr. ${esc(CONFIG.mobilePayNumber)}).</p>
-        <p class="muted small" style="text-align:center">Ordren er først endelig, når betalingen er modtaget.</p>
+        <p style="text-align:center;font-weight:600;margin:14px 0 4px">Betal nemt med MobilePay. Betalingskvitteringen er din ordrekvittering.</p>
+        <p class="muted small" style="text-align:center;margin-top:0">Ordren er først endelig, når betalingen er modtaget.</p>
         <section class="card">
           <h2>Sådan henter du</h2>
           <dl class="info">
