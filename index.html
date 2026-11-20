@@ -2428,10 +2428,9 @@ const CONFIG = {
   // https://qr.mobilepay.dk/paymentlink?phone=…&amount=…&comment=…&lock=1
   // comment = beskrivelse (maks 60 tegn, ingen personoplysninger), lock=1 = kunden kan ikke ændre den.
   mobilePayLinkBase: 'https://qr.mobilepay.dk/paymentlink',
-  // Beløbsformat i linket. Supportens eksempel brugte amount=25000.
-  //   'oere' → 250 kr. sendes som 25000   |   'kr' → 250 kr. sendes som 250.00
-  // AFKLARES med en testbetaling før go-live.
-  amountFormat: 'oere',
+  // Beløbsformat i linket: kroner (bekræftet med test 20.11.2026 – amount=200 viste 200 kr.).
+  //   'kr' → 250 kr. sendes som 250   |   'oere' → 250 kr. sendes som 25000
+  amountFormat: 'kr',
   commentPrefix: 'Julemad ',
 
   // Hvor ordren sendes hen. Tom = prototype (gemmes kun lokalt i browseren).
@@ -2541,7 +2540,7 @@ function newOrderNo(canteen){
 function mobilePayLink(order){
   const u = new URL(CONFIG.mobilePayLinkBase);
   u.searchParams.set('phone', CONFIG.mobilePayNumber);
-  u.searchParams.set('amount', CONFIG.amountFormat === 'oere' ? String(Math.round(order.total * 100)) : order.total.toFixed(2));
+  u.searchParams.set('amount', CONFIG.amountFormat === 'oere' ? String(Math.round(order.total * 100)) : (Number.isInteger(order.total) ? String(order.total) : order.total.toFixed(2)));
   u.searchParams.set('comment', (CONFIG.commentPrefix + order.orderNo).slice(0, 60));   // ingen personoplysninger
   u.searchParams.set('lock', '1');
   return u.toString().replace(/\+/g, '%20');   // mellemrum som %20, som i MobilePays eget eksempel
