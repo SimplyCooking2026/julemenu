@@ -2431,7 +2431,9 @@ const CONFIG = {
   // Beløbsformat i linket: kroner (bekræftet med test 20.11.2026 – amount=200 viste 200 kr.).
   //   'kr' → 250 kr. sendes som 250   |   'oere' → 250 kr. sendes som 25000
   amountFormat: 'kr',
-  commentPrefix: 'Julemad ',
+  // Beskrivelsen i MobilePay = ordrenr. + varer, fx "JUL-A-7K3Q 1 and, 2 rødkål" (maks 60 tegn).
+  // Så kan køkkenet se hele ordren direkte i MobilePay-eksporten.
+  maxPerItem: 20,
 
   // Hvor ordren sendes hen. Tom = prototype (gemmes kun lokalt i browseren).
   // I drift: URL til fx et Power Automate-flow ("When an HTTP request is received"),
@@ -2452,16 +2454,16 @@ const CONFIG = {
   // Produkter. Ingredienslister er EKSEMPLER – køkkenet skal udfylde de rigtige.
   // Allergener markeres med *stjerner* og bliver fede/versaler på etiketten.
   products: [
-    { id:'and',     kind:'main',  name:'Økologisk frilands juleand', unit:'1 stk', price:500,
+    { id:'and',     kind:'main',  short:'and',  name:'Økologisk frilands juleand', unit:'1 stk', price:500,
       ingredients:'Økologisk frilandsand, salt, peber, æble, svesker, timian',
       storage:'Opbevares på køl, 0–5 °C. Genopvarmes til min. 75 °C.' },
-    { id:'andesovs', kind:'sauce', name:'Andesovs', unit:'1 liter', price:150,
+    { id:'andesovs', kind:'sauce', short:'andesovs', name:'Andesovs', unit:'1 liter', price:150,
       ingredients:'Andefond, *fløde*, *hvedemel*, *smør*, ribsgelé, salt, peber',
       storage:'Opbevares på køl, 0–5 °C. Opvarmes under omrøring.' },
-    { id:'flaeskesovs', kind:'sauce', name:'Flæskestegssovs', unit:'1 liter', price:150,
+    { id:'flaeskesovs', kind:'sauce', short:'flæskesovs', name:'Flæskestegssovs', unit:'1 liter', price:150,
       ingredients:'Svinefond, *fløde*, *hvedemel*, *smør*, laurbærblad, salt, peber',
       storage:'Opbevares på køl, 0–5 °C. Opvarmes under omrøring.' },
-    { id:'roedkaal', kind:'side', name:'Rødkål', unit:'1 liter', price:100,
+    { id:'roedkaal', kind:'side', short:'rødkål', name:'Rødkål', unit:'1 liter', price:100,
       ingredients:'Rødkål, eddike, sukker, ribssaft, æble, kanel, nellike, salt',
       storage:'Opbevares på køl, 0–5 °C.' },
   ],
@@ -2534,14 +2536,21 @@ function priceCart(cart){
 function newOrderNo(canteen){
   const existing = new Set(getOrders().map(o=>o.orderNo));
   let no;
-  do { no = `JUL-${canteen.code}-${String(Math.floor(1000 + Math.random()*9000))}`; } while(existing.has(no));
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  do { no = `JUL-${canteen.code}-` + Array.from({length:4}, () => abc[Math.floor(Math.random()*abc.length)]).join(''); } while(existing.has(no));
   return no;
+}
+function orderComment(order){
+  const parts = CONFIG.products.filter(p => order.cart[p.id] > 0).map(p => `${order.cart[p.id]} ${p.short}`);
+  let c = `${order.orderNo} ${parts.join(', ')}`;
+  if(c.length > 60) c = `${order.orderNo} ` + CONFIG.products.filter(p => order.cart[p.id] > 0).map(p => `${order.cart[p.id]}${p.short.slice(0,3)}`).join(' ');
+  return c.slice(0, 60);
 }
 function mobilePayLink(order){
   const u = new URL(CONFIG.mobilePayLinkBase);
   u.searchParams.set('phone', CONFIG.mobilePayNumber);
   u.searchParams.set('amount', CONFIG.amountFormat === 'oere' ? String(Math.round(order.total * 100)) : (Number.isInteger(order.total) ? String(order.total) : order.total.toFixed(2)));
-  u.searchParams.set('comment', (CONFIG.commentPrefix + order.orderNo).slice(0, 60));   // ingen personoplysninger
+  u.searchParams.set('comment', orderComment(order));   // ordrenr. + varer – ingen personoplysninger
   u.searchParams.set('lock', '1');
   return u.toString().replace(/\+/g, '%20');   // mellemrum som %20, som i MobilePays eget eksempel
 }
@@ -2631,7 +2640,7 @@ function renderCustomer(){
             <div class="step">
               <button aria-label="Færre ${esc(pr.name)}" data-dec="${pr.id}" ${!(state.cart[pr.id]>0)?'disabled':''}>−</button>
               <span>${state.cart[pr.id]||0}</span>
-              <button aria-label="Flere ${esc(pr.name)}" data-inc="${pr.id}">+</button>
+              <button aria-label="Flere ${esc(pr.name)}" data-inc="${pr.id}" ${(state.cart[pr.id]||0)>=CONFIG.maxPerItem?'disabled':''}>+</button>
             </div>
           </div>`).join('')}
         ${CONFIG.bundleEnabled ? `<div class="deal">🎁 <b>Pakkepris:</b> 1 valgfri sovs + 1 rødkål = ${CONFIG.bundlePrice} kr. Rabatten trækkes automatisk fra.</div>` : ''}
@@ -2642,7 +2651,7 @@ function renderCustomer(){
         <button class="btn" id="toDetails" ${p.items===0?'disabled':''}>Videre</button>
       </div>
     </div>`;
-    app.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]=(state.cart[b.dataset.inc]||0)+1; renderCustomer();});
+    app.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>{state.cart[b.dataset.inc]=Math.min(CONFIG.maxPerItem,(state.cart[b.dataset.inc]||0)+1); renderCustomer();});
     app.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>{state.cart[b.dataset.dec]=Math.max(0,(state.cart[b.dataset.dec]||0)-1); renderCustomer();});
     $('#toDetails').onclick=()=>{state.step='details'; renderCustomer(); scrollTo(0,0);};
     return;
@@ -2761,7 +2770,7 @@ function linesHtml(p){
 /* =====================================================================
    PERSONALE / ØKONOMI
    ===================================================================== */
-const staff = { tab:'ordrer', canteen:'alle', recon:null };
+const staff = { tab:'koekken', canteen:'alle', recon:null, kitchen:null, kitchenText:'' };
 
 function renderStaff(){
   const app = $('#app');
@@ -2799,7 +2808,7 @@ function renderStaff(){
       <div class="kpi"><div class="v">${active.length-paid.length}</div><div class="l">Mangler afstemning</div></div>
     </div>
     <div class="tabs">
-      ${[['ordrer','Ordrer'],['afstem','Afstem MobilePay'],['produktion','Produktionsliste'],['etiketter','Etiketter'],['bogforing','Bogføring']].map(([k,l])=>`<button data-tab="${k}" class="${staff.tab===k?'on':''}">${l}</button>`).join('')}
+      ${[['koekken','Køkkenliste fra MobilePay'],['ordrer','Ordrer'],['afstem','Afstem MobilePay'],['produktion','Produktionsliste'],['etiketter','Etiketter'],['bogforing','Bogføring']].map(([k,l])=>`<button data-tab="${k}" class="${staff.tab===k?'on':''}">${l}</button>`).join('')}
     </div>
     <div id="tabBody"></div>
   </div>`;
@@ -2815,6 +2824,7 @@ function renderStaff(){
   if(staff.tab==='afstem') body.innerHTML = reconTab();
   if(staff.tab==='produktion') body.innerHTML = productionTab(active);
   if(staff.tab==='etiketter') body.innerHTML = labelsTab(active);
+  if(staff.tab==='koekken') body.innerHTML = kitchenTab();
   if(staff.tab==='bogforing') body.innerHTML = bookkeepingTab(all.filter(o=>o.status!=='annulleret'));
   wireStaff(body);
 }
@@ -2871,7 +2881,7 @@ function runRecon(text){
   const seen = new Set();
   for(const raw of text.split(/\r?\n/)){
     const line = raw.trim(); if(!line) continue;
-    const m = line.match(/JUL-[A-Z]-\d+/i);
+    const m = line.match(/JUL-[A-Z]-[A-Z0-9]+/i);
     // beløb: find tal med komma/punktum som decimal, tag det der ligner et beløb
     const amounts = [...line.matchAll(/(?<![\d-])(\d{1,3}(?:[.\s]\d{3})*|\d+)[,.](\d{2})(?!\d)/g)].map(a=>parseFloat(a[1].replace(/[.\s]/g,'')+'.'+a[2]));
     if(!m){ if(amounts.length) res.unknown.push(line); continue; }
@@ -2960,8 +2970,80 @@ function wireStaff(body){
       $('#reconInput').value = lines.join('\n');
     };
   }
+  const kr_ = $('#kitchenRun', body);
+  if(kr_){
+    kr_.onclick = () => { staff.kitchenText = $('#kitchenInput').value; staff.kitchen = parseMobilePay(staff.kitchenText); renderStaff(); };
+    $('#kitchenDemo').onclick = () => {
+      const os = getOrders().filter(o=>o.status!=='annulleret');
+      if(!os.length){ toast('Opret testordrer først'); return; }
+      const lines = ['Dato;Beløb;Besked'];
+      os.forEach(o => lines.push(`12-12-2026;${o.total.toFixed(2).replace('.',',')};${orderComment(o)}`));
+      $('#kitchenInput').value = lines.join('\n');
+    };
+    const kc = $('#kitchenCsv', body);
+    if(kc) kc.onclick = async () => { try{ await navigator.clipboard.writeText(kitchenCsv(staff.kitchen)); toast('Køkkenliste kopieret – indsæt i Excel'); }catch(e){ toast('Kopiering blev afvist af browseren'); } };
+  }
   const cp = $('#copyCsv', body);
   if(cp) cp.onclick = async () => { try{ await navigator.clipboard.writeText(ordersCsv()); toast('CSV kopieret – indsæt i Excel'); }catch(e){ toast('Kopiering blev afvist af browseren'); } };
+}
+
+/* ---------- Køkkenliste ud fra MobilePay-eksporten ---------- */
+function parseMobilePay(text){
+  const seen = new Map(), skipped = [];
+  for(const raw of text.split(/\r?\n/)){
+    const line = raw.trim(); if(!line) continue;
+    const m = line.match(/JUL-([A-Z])-([A-Z0-9]+)/i);
+    if(!m){ if(/\d[,.]\d{2}/.test(line)) skipped.push(line); continue; }
+    const orderNo = m[0].toUpperCase(), code = m[1].toUpperCase();
+    const canteen = CONFIG.canteens.find(c => c.code === code);
+    const cart = {};
+    for(const p of CONFIG.products){
+      const mm = line.match(new RegExp('(\\d+)\\s*' + p.short + '(?![a-zæøå])', 'i'));
+      if(mm) cart[p.id] = parseInt(mm[1], 10);
+      else { const ms = line.match(new RegExp('(\\d+)' + p.short.slice(0,3) + '(?![a-zæøå])', 'i')); if(ms) cart[p.id] = parseInt(ms[1], 10); }
+    }
+    const amounts = [...line.matchAll(/(?<![\d-])(\d{1,3}(?:[.\s]\d{3})*|\d+)[,.](\d{2})(?!\d)/g)].map(a=>parseFloat(a[1].replace(/[.\s]/g,'')+'.'+a[2]));
+    const paid = amounts.length ? amounts[0] : NaN;
+    const expected = CONFIG.products.reduce((s,p)=>s+(cart[p.id]||0)*p.price, 0);
+    const prev = seen.get(orderNo);
+    if(prev){ prev.dupe = true; continue; }
+    seen.set(orderNo, {orderNo, code, canteenName: canteen ? canteen.name : 'Ukendt ('+code+')', cart, paid, expected, ok: Math.abs(paid-expected) < 0.005 && expected > 0});
+  }
+  return { orders: [...seen.values()], skipped };
+}
+function kitchenTab(){
+  const k = staff.kitchen;
+  let out = `<div class="card">
+    <h3>Indsæt MobilePay-transaktioner for nr. ${esc(CONFIG.mobilePayNumber)}</h3>
+    <p class="muted small">Eksportér betalingerne fra Get Paid eller MobilePay-portalen, og indsæt dem her. Hver betaling indeholder ordrenummer og varer i beskrivelsen, fx <code>JUL-A-7K3Q 1 and, 2 rødkål</code>. Kun betalte ordrer kommer med. Data bliver i denne browser.</p>
+    <textarea id="kitchenInput" placeholder="Indsæt eksporten her">${esc(staff.kitchenText)}</textarea>
+    <div class="row" style="margin-top:8px"><button class="btn primary small" id="kitchenRun">Lav køkkenliste</button><button class="btn ghost small" id="kitchenDemo">Indsæt eksempel ud fra testordrer</button></div>
+  </div>`;
+  if(!k) return out;
+  const os = k.orders, good = os.filter(o=>o.ok), bad = os.filter(o=>!o.ok);
+  const byC = CONFIG.canteens.map(c => ({c, os: good.filter(o=>o.code===c.code)})).filter(x=>x.os.length);
+  out += `<div class="card" style="overflow-x:auto"><h3>Det skal laves (${good.length} betalte ordrer)</h3>
+    <table><tr><th>Kantine</th><th class="num">Ordrer</th>${CONFIG.products.map(p=>`<th class="num">${esc(p.name)}<br><span style="text-transform:none">${esc(p.unit)}</span></th>`).join('')}</tr>
+    ${byC.map(x=>`<tr><td>${esc(x.c.name)}</td><td class="num">${x.os.length}</td>${CONFIG.products.map(p=>`<td class="num">${x.os.reduce((s,o)=>s+(o.cart[p.id]||0),0)}</td>`).join('')}</tr>`).join('')}
+    <tr style="font-weight:700"><td>I alt</td><td class="num">${good.length}</td>${CONFIG.products.map(p=>`<td class="num">${good.reduce((s,o)=>s+(o.cart[p.id]||0),0)}</td>`).join('')}</tr></table>
+    <div class="row" style="margin-top:12px"><button class="btn ghost small" id="kitchenCsv">Kopiér ordreliste til Excel</button></div></div>`;
+  if(bad.length || k.skipped.length) out += `<div class="card"><h3>Skal tjekkes</h3>
+    ${bad.map(o=>`<p class="small"><span class="pill red">Beløb passer ikke</span> <span class="ordno">${o.orderNo}</span>: betalt ${isNaN(o.paid)?'?':kr(o.paid)}, varerne koster ${kr(o.expected)} Ikke med i køkkenlisten.</p>`).join('')}
+    ${k.skipped.map(l=>`<p class="small"><span class="pill warn">Uden ordrenr.</span> ${esc(l)}</p>`).join('')}</div>`;
+  out += `<div class="card"><h3>Ordrer og etiketter</h3><p class="muted small">Én etiket pr. vare med ordrenummer og afhentningssted. Ingredienser og allergener kommer fra produktlisten.</p><div class="labels">
+    ${good.flatMap(o => CONFIG.products.flatMap(p => Array.from({length:o.cart[p.id]||0}, () => `
+      <div class="label"><div class="row" style="justify-content:space-between"><span class="who ordno">${o.orderNo}</span><span class="small">${esc(o.canteenName)}</span></div>
+      <div class="what">${esc(p.name)} · ${esc(p.unit)}</div>
+      <div><span class="muted">Ingredienser:</span> ${allergenHtml(p.ingredients)}</div>
+      <div style="margin-top:4px">${esc(p.storage)}</div>
+      <div style="margin-top:4px" class="muted">Bedst før: ____ · ${esc(CONFIG.producer)}</div></div>`))).join('')}
+  </div></div>`;
+  return out;
+}
+function kitchenCsv(k){
+  const head = ['Ordrenr','Kantine',...CONFIG.products.map(p=>p.name),'Betalt'];
+  const rows = (k?k.orders:[]).filter(o=>o.ok).map(o=>[o.orderNo,o.canteenName,...CONFIG.products.map(p=>o.cart[p.id]||0),String(o.paid).replace('.',',')]);
+  return [head,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
 }
 
 function seedOrders(){
