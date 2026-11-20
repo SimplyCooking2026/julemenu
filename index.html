@@ -139,10 +139,15 @@ const CONFIG = {
   mobilePayNumber: '849000',   // Simply Cooking Event
 
   // Én linje pr. kantine. "code" bruges i ordrenummeret. Udfyld rigtige navne og adresser.
+  // Vises i alfabetisk rækkefølge. code = ét bogstav i ordrenummeret (JUL-F-…) og dermed i MobilePay-beskrivelsen.
   canteens: [
-    { id:'kantine-a', code:'A', name:'Kantine A', address:'Adresse udfyldes' },
-    { id:'kantine-b', code:'B', name:'Kantine B', address:'Adresse udfyldes' },
-    { id:'kantine-c', code:'C', name:'Kantine C', address:'Adresse udfyldes' },
+    { id:'freja',       code:'F', name:'Freja',              address:'Litauen Alle 6' },
+    { id:'hoerkaer',    code:'H', name:'Hørkær 20',          address:'' },
+    { id:'kalvebod',    code:'K', name:'Kalvebod Brygge 45', address:'' },
+    { id:'lindehuset',  code:'L', name:'Lindehuset',         address:'Lindevangs Alle 8' },
+    { id:'nobelsgaard', code:'N', name:'Nobelsgård',         address:'Nordre Fasanvej 108' },
+    { id:'palmehaven',  code:'B', name:'Palmehaven',         address:'Bernstorffsgade 21' },
+    { id:'park-alle',   code:'P', name:'Park Alle 295',      address:'' },
   ],
 
   // Produkter. Ingredienslister er EKSEMPLER – køkkenet skal udfylde de rigtige.
@@ -182,7 +187,9 @@ const kr = n => n.toLocaleString('da-DK', {minimumFractionDigits:0, maximumFract
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtDate = iso => new Date(iso).toLocaleString('da-DK',{timeZone:'Europe/Copenhagen',weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
 const prodById = id => CONFIG.products.find(p => p.id === id);
+CONFIG.canteens.sort((a,b) => a.name.localeCompare(b.name, 'da'));
 const canteenById = id => CONFIG.canteens.find(c => c.id === id);
+const canteenLabel = c => c.address ? `${c.name} – ${c.address}` : c.name;
 
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
 
@@ -363,13 +370,10 @@ function renderCustomer(){
         <label for="f-phone">Mobilnummer</label>
         <input type="tel" id="f-phone" autocomplete="tel" inputmode="numeric" placeholder="8 cifre" value="${esc(f.phone)}">
         ${e.phone?`<div class="err">${e.phone}</div>`:''}
-        <label for="f-email">E-mail (til kvittering)</label>
-        <input type="email" id="f-email" autocomplete="email" value="${esc(f.email)}">
-        ${e.email?`<div class="err">${e.email}</div>`:''}
-        <label for="f-canteen">Afhentes i</label>
+        <label for="f-canteen">Vælg din kantine</label>
         <select id="f-canteen">
-          <option value="">Vælg kantine</option>
-          ${CONFIG.canteens.map(k=>`<option value="${k.id}" ${k.id===f.canteenId?'selected':''}>${esc(k.name)}</option>`).join('')}
+          <option value="">Vælg din kantine</option>
+          ${CONFIG.canteens.map(k=>`<option value="${k.id}" ${k.id===f.canteenId?'selected':''}>${esc(canteenLabel(k))}</option>`).join('')}
         </select>
         ${e.canteenId?`<div class="err">${e.canteenId}</div>`:''}
         <label class="check" style="margin-top:16px"><input type="checkbox" id="f-terms" ${f.terms?'checked':''}>
@@ -383,15 +387,14 @@ function renderCustomer(){
       </div>
       <div class="err" id="submitErr" role="alert" style="margin-top:10px;font-size:.95rem"></div>
     </div>`;
-    const read = () => { f.name=$('#f-name').value.trim(); f.phone=$('#f-phone').value.replace(/\s/g,''); f.email=$('#f-email').value.trim(); f.canteenId=$('#f-canteen').value; f.terms=$('#f-terms').checked; };
+    const read = () => { f.name=$('#f-name').value.trim(); f.phone=$('#f-phone').value.replace(/\s/g,''); f.canteenId=$('#f-canteen').value; f.terms=$('#f-terms').checked; };
     $('#back').onclick=()=>{read(); state.step='menu'; renderCustomer();};
     $('#toPay').onclick=async ()=>{
       read();
       const er = {};
       if(f.name.length<2) er.name='Skriv dit navn.';
       if(!/^(\+45)?\d{8}$/.test(f.phone)) er.phone='Skriv et dansk mobilnummer på 8 cifre.';
-      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) er.email='Skriv en gyldig e-mail.';
-      if(!f.canteenId) er.canteenId='Vælg hvor du henter.';
+      if(!f.canteenId) er.canteenId='Vælg din kantine.';
       if(!f.terms) er.terms='Du skal acceptere betingelserne.';
       state.errors = er;
       if(Object.keys(er).length){ renderCustomer(); return; }
@@ -428,12 +431,12 @@ function renderCustomer(){
         <section class="card">
           <h2>Sådan henter du</h2>
           <dl class="info">
-            <dt>Hvor</dt><dd>${esc(k.name)}, ${esc(k.address)}</dd>
+            <dt>Hvor</dt><dd>${esc(k.name)}${k.address ? ', ' + esc(k.address) : ''}</dd>
             <dt>Hvornår</dt><dd>Fra ${fmtDate(CONFIG.pickupFrom)}</dd>
             <dt>Navn</dt><dd>${esc(o.name)}</dd>
             <dt>Betalt</dt><dd>${kr(o.total)} via MobilePay ${esc(CONFIG.mobilePayNumber)}</dd>
           </dl>
-          <p class="muted small" style="margin-bottom:0">Vi afstemmer din betaling med ordrenummeret. Kvittering sendes til ${esc(o.email)}.</p>
+          <p class="muted small" style="margin-bottom:0">Vi afstemmer din betaling med ordrenummeret.</p>
         </section>` : `
         <section class="card">
           <table class="lines">${linesHtml({lines:o.lines,total:o.total,vat:o.vat})}</table>
@@ -444,7 +447,7 @@ function renderCustomer(){
         <section class="card">
           <h2>Sådan henter du</h2>
           <dl class="info">
-            <dt>Hvor</dt><dd>${esc(k.name)}, ${esc(k.address)}</dd>
+            <dt>Hvor</dt><dd>${esc(k.name)}${k.address ? ', ' + esc(k.address) : ''}</dd>
             <dt>Hvornår</dt><dd>Fra ${fmtDate(CONFIG.pickupFrom)}</dd>
             <dt>Navn</dt><dd>${esc(o.name)}</dd>
             <dt>Ordrenr.</dt><dd class="ordno">${o.orderNo}</dd>
